@@ -15,20 +15,20 @@ import {
   User,
   LogOut,
   ChevronDown,
-  UserPlus, // Novo ícone
-  Briefcase // Novo ícone para cuidadoras
+  UserPlus,
+  Briefcase
 } from 'lucide-react';
 import { useTurnos } from '@/hooks/useTurnos';
 import { Turno } from '@/types';
 import ListaTurnos from './ListaTurnos';
 import ModalSubstituicao from './ModalSubstituicao';
-import ModalAdicionarCliente from './ModalAdicionarCliente'; // Novo
-import ModalAdicionarCuidadora from './ModalAdicionarCuidadora'; // Novo
+import ModalAdicionarCliente from './ModalAdicionarCliente';
+import ModalAdicionarCuidadora from './ModalAdicionarCuidadora';
 import ModalAdicionarTurno from './ModalAdicionarTurno';
 import { supabase } from '@/lib/supabase';
 
 export default function DashboardGestora() {
-  // 1. ESTADOS (Preservados e Novos)
+  // 1. ESTADOS
   const [filtroAtivo, setFiltroAtivo] = useState<'todos' | 'hoje' | 'faltas'>('todos');
   const [dataSelecionada, setDataSelecionada] = useState(new Date().toISOString().split('T')[0]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,10 +41,10 @@ export default function DashboardGestora() {
   
   const [turnoSelecionado, setTurnoSelecionado] = useState<Turno | null>(null);
 
-  // 2. DADOS (Hook useTurnos com regra permanente de preservação de stats)
+  // 2. DADOS
   const { turnos, loading, stats, refetch } = useTurnos(filtroAtivo, dataSelecionada);
 
-  // 3. HANDLERS (Ações Operacionais)
+  // 3. HANDLERS
   const handleAbrirSubstituicao = (turno: Turno) => {
     setTurnoSelecionado(turno);
     setIsModalOpen(true);
@@ -69,7 +69,7 @@ export default function DashboardGestora() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* HEADER PRINCIPAL (Preservado conforme design anterior) */}
+      {/* HEADER PRINCIPAL */}
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -115,7 +115,7 @@ export default function DashboardGestora() {
       {/* CONTEÚDO PRINCIPAL */}
       <main className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
         
-        {/* Título, Botões de Gestão e Seletor de Data */}
+        {/* Título e Ações de Topo */}
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
           <div className="space-y-1">
             <h1 className="text-3xl font-black text-slate-900 tracking-tight">Painel de Gestora</h1>
@@ -123,7 +123,6 @@ export default function DashboardGestora() {
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
-            {/* BOTÕES DE ADIÇÃO (Novos conforme pedido da Sara) */}
             <button 
               onClick={() => setIsClientModalOpen(true)}
               className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold text-sm hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm active:scale-95"
@@ -137,10 +136,8 @@ export default function DashboardGestora() {
               <Briefcase className="w-4 h-4 text-emerald-500" /> + Cuidadora
             </button>
 
-            {/* Separador Visual */}
             <div className="w-px h-8 bg-slate-200 mx-2 hidden sm:block" />
 
-            {/* Seletor de Data */}
             <div className="flex items-center gap-3 bg-white p-2 rounded-2xl shadow-sm border border-slate-200 group hover:border-indigo-300 transition-colors">
               <Calendar className="w-5 h-5 text-indigo-500 ml-2" />
               <input 
@@ -153,7 +150,7 @@ export default function DashboardGestora() {
           </div>
         </div>
 
-        {/* Stats Cards (Preservados conforme design anterior) */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
             <div className="flex items-center gap-3 text-slate-400 mb-4">
@@ -179,39 +176,25 @@ export default function DashboardGestora() {
             <div className="text-4xl font-black text-amber-600">{stats.pendentes}</div>
           </div>
 
-<div 
-  onClick={() => setIsShiftModalOpen(true)} // Torna o card todo clicável
-  className="bg-slate-900 p-6 rounded-3xl shadow-xl shadow-slate-200 flex flex-col justify-between group cursor-pointer hover:bg-indigo-950 transition-all"
->
-  <div className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Agenda Rápida</div>
-  <button className="text-white font-bold flex items-center gap-3 text-lg mt-4">
-    Novo Turno <div className="p-1 bg-white/10 rounded-lg group-hover:bg-white/20"><Plus className="w-5 h-5" /></div>
-  </button>
-</div>
+          <div 
+            onClick={() => setIsShiftModalOpen(true)}
+            className="bg-slate-900 p-6 rounded-3xl shadow-xl shadow-slate-200 flex flex-col justify-between group cursor-pointer hover:bg-indigo-950 transition-all"
+          >
+            <div className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Agenda Rápida</div>
+            <button className="text-white font-bold flex items-center gap-3 text-lg mt-4">
+              Novo Turno <div className="p-1 bg-white/10 rounded-lg group-hover:bg-white/20"><Plus className="w-5 h-5" /></div>
+            </button>
+          </div>
+        </div>
 
         {/* Lista e Filtros */}
         <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-slate-100 space-y-6 bg-slate-50/30">
             <div className="flex flex-col md:flex-row gap-6 justify-between items-center">
               <div className="flex bg-slate-200/50 p-1.5 rounded-2xl w-full md:w-fit">
-                <button 
-                  onClick={() => setFiltroAtivo('todos')}
-                  className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${filtroAtivo === 'todos' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  Todos
-                </button>
-                <button 
-                  onClick={() => setFiltroAtivo('hoje')}
-                  className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${filtroAtivo === 'hoje' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  Confirmados
-                </button>
-                <button 
-                  onClick={() => setFiltroAtivo('faltas')}
-                  className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${filtroAtivo === 'faltas' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  Faltas
-                </button>
+                <button onClick={() => setFiltroAtivo('todos')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${filtroAtivo === 'todos' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Todos</button>
+                <button onClick={() => setFiltroAtivo('hoje')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${filtroAtivo === 'hoje' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Confirmados</button>
+                <button onClick={() => setFiltroAtivo('faltas')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${filtroAtivo === 'faltas' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Faltas</button>
               </div>
 
               <div className="relative w-full md:max-w-md group">
@@ -238,38 +221,19 @@ export default function DashboardGestora() {
         </div>
       </main>
 
-      {/* 4. MODAIS (Integrados e Novos) */}
-      
-      {/* Modal Substituição */}
+      {/* 4. MODAIS */}
       {isModalOpen && turnoSelecionado && (
-        <ModalSubstituicao 
-          turno={turnoSelecionado}
-          onClose={() => setIsModalOpen(false)}
-          onSuccess={refetch}
-        />
+        <ModalSubstituicao turno={turnoSelecionado} onClose={() => setIsModalOpen(false)} onSuccess={refetch} />
       )}
-
-      {/* Modal Adicionar Cliente (Novo) */}
       {isClientModalOpen && (
-        <ModalAdicionarCliente 
-          onClose={() => setIsClientModalOpen(false)} 
-          onSuccess={refetch} 
-        />
+        <ModalAdicionarCliente onClose={() => setIsClientModalOpen(false)} onSuccess={refetch} />
       )}
-
-      {/* Modal Adicionar Cuidadora (Novo) */}
       {isCaregiverModalOpen && (
-        <ModalAdicionarCuidadora 
-          onClose={() => setIsCaregiverModalOpen(false)} 
-          onSuccess={refetch} 
-        />
+        <ModalAdicionarCuidadora onClose={() => setIsCaregiverModalOpen(false)} onSuccess={refetch} />
       )}
       {isShiftModalOpen && (
-  <ModalAdicionarTurno 
-    onClose={() => setIsShiftModalOpen(false)} 
-    onSuccess={refetch} 
-  />
-)}
+        <ModalAdicionarTurno onClose={() => setIsShiftModalOpen(false)} onSuccess={refetch} />
+      )}
     </div>
   );
 }
