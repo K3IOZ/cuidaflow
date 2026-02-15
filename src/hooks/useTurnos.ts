@@ -11,18 +11,25 @@ export function useTurnos(filtroAtivo: 'todos' | 'hoje' | 'faltas', dataSelecion
         setLoading(true);
         setError(null);
         try {
-            // A query agora é filtrada pela data selecionada no Dashboard
+            // Consulta ao Supabase filtrada pela organização e pela data do seletor
             let query = supabase
                 .from('shifts')
                 .select(`
-                    id, shift_date, start_time, end_time, status, tasks, type,
+                    id, 
+                    shift_date, 
+                    start_time, 
+                    end_time, 
+                    status, 
+                    tasks, 
+                    type,
+                    caregiver_id,
                     client:clients (name, address),
                     caregiver:caregivers!caregiver_id (name)
                 `)
                 .eq('shift_date', dataSelecionada)
                 .eq('org_id', 'a0000000-0000-0000-0000-000000000001');
 
-            // Filtro de faltas atua sobre a data selecionada
+            // Se o filtro de faltas estiver ativo, filtramos apenas os 'no_show'
             if (filtroAtivo === 'faltas') {
                 query = query.eq('status', 'no_show');
             }
@@ -31,17 +38,25 @@ export function useTurnos(filtroAtivo: 'todos' | 'hoje' | 'faltas', dataSelecion
             if (dbError) throw dbError;
 
             const transformados: Turno[] = (data as any[]).map(s => {
-                let statusFinal: any = 'pendente';
-                if (s.status === 'no_show') statusFinal = 'falta';
-                if (s.status === 'confirmed') statusFinal = 'confirmado';
-                if (s.status === 'scheduled') statusFinal = 'pendente';
+                let statusFinal: Turno['status'] = 'pendente';
+                
+                // Lógica de mapeamento para os novos estados da interface
+                if (s.status === 'no_show') {
+                    statusFinal = 'falta';
+                } else if (s.status === 'confirmed') {
+                    statusFinal = 'confirmado';
+                } else if (!s.caregiver_id) {
+                    statusFinal = 'vazio'; // Identifica turnos sem cuidadora para o botão "Atribuir"
+                } else {
+                    statusFinal = 'pendente';
+                }
 
                 return {
                     id: s.id,
                     cliente: s.client?.name || 'Sem nome',
                     localizacao: s.client?.address || 'Sem morada',
                     horario: `${s.start_time.slice(0,5)} - ${s.end_time.slice(0,5)}`,
-                    duracao: '4h', 
+                    duracao: '4h', // Valor padrão ou calculado se necessário
                     status: statusFinal,
                     tipo: s.type || 'Normal',
                     data: s.shift_date,
@@ -63,11 +78,12 @@ export function useTurnos(filtroAtivo: 'todos' | 'hoje' | 'faltas', dataSelecion
         fetchTurnos();
     }, [fetchTurnos]);
 
+    // Estatísticas que alimentam os cards do topo do Dashboard
     const stats = {
         total: turnos.length,
         faltas: turnos.filter(t => t.status === 'falta').length,
         criticos: turnos.filter(t => t.status === 'critico').length,
-        pendentes: turnos.filter(t => t.status === 'pendente').length,
+        pendentes: turnos.filter(t => t.status === 'pendente' || t.status === 'vazio').length,
     };
 
     return { turnos, loading, error, refetch: fetchTurnos, stats };
