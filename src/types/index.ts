@@ -4,7 +4,8 @@ export interface Turno {
     localizacao: string;
     horario: string;
     duracao: string;
-    status: 'confirmado' | 'falta' | 'pendente' | 'critico' | 'no_show'; // Adicionei no_show
+    // Adicionado 'vazio' para permitir a atribuição de novos turnos
+    status: 'confirmado' | 'falta' | 'pendente' | 'critico' | 'no_show' | 'vazio'; 
     cuidadora?: string | null;
     tipo: 'Normal' | 'Adaptado';
     data: string;
