@@ -24,6 +24,7 @@ import ListaTurnos from './ListaTurnos';
 import ModalSubstituicao from './ModalSubstituicao';
 import ModalAdicionarCliente from './ModalAdicionarCliente'; // Novo
 import ModalAdicionarCuidadora from './ModalAdicionarCuidadora'; // Novo
+import ModalAdicionarTurno from './ModalAdicionarTurno';
 import { supabase } from '@/lib/supabase';
 
 export default function DashboardGestora() {
@@ -36,6 +37,7 @@ export default function DashboardGestora() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [isCaregiverModalOpen, setIsCaregiverModalOpen] = useState(false);
+  const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
   
   const [turnoSelecionado, setTurnoSelecionado] = useState<Turno | null>(null);
 
@@ -177,13 +179,15 @@ export default function DashboardGestora() {
             <div className="text-4xl font-black text-amber-600">{stats.pendentes}</div>
           </div>
 
-          <div className="bg-slate-900 p-6 rounded-3xl shadow-xl shadow-slate-200 flex flex-col justify-between group cursor-pointer hover:bg-indigo-950 transition-all">
-            <div className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Agenda Rápida</div>
-            <button className="text-white font-bold flex items-center gap-3 text-lg mt-4">
-              Novo Turno <div className="p-1 bg-white/10 rounded-lg group-hover:bg-white/20"><Plus className="w-5 h-5" /></div>
-            </button>
-          </div>
-        </div>
+<div 
+  onClick={() => setIsShiftModalOpen(true)} // Torna o card todo clicável
+  className="bg-slate-900 p-6 rounded-3xl shadow-xl shadow-slate-200 flex flex-col justify-between group cursor-pointer hover:bg-indigo-950 transition-all"
+>
+  <div className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Agenda Rápida</div>
+  <button className="text-white font-bold flex items-center gap-3 text-lg mt-4">
+    Novo Turno <div className="p-1 bg-white/10 rounded-lg group-hover:bg-white/20"><Plus className="w-5 h-5" /></div>
+  </button>
+</div>
 
         {/* Lista e Filtros */}
         <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden">
@@ -260,6 +264,12 @@ export default function DashboardGestora() {
           onSuccess={refetch} 
         />
       )}
+      {isShiftModalOpen && (
+  <ModalAdicionarTurno 
+    onClose={() => setIsShiftModalOpen(false)} 
+    onSuccess={refetch} 
+  />
+)}
     </div>
   );
 }
