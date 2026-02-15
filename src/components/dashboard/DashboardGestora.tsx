@@ -1,208 +1,162 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import {
-    AlertCircle,
-    Calendar,
-    Clock,
-    Filter,
-    Bell,
-    Menu,
-    Loader2,
-    RefreshCw,
-    AlertTriangle
+import { useState } from 'react';
+import { 
+  Users, 
+  Calendar, 
+  AlertCircle, 
+  Clock,
+  Filter,
+  Search,
+  Plus
 } from 'lucide-react';
+import { useTurnos } from '@/hooks/useTurnos';
 import { Turno } from '@/types';
 import ListaTurnos from './ListaTurnos';
 import ModalSubstituicao from './ModalSubstituicao';
-import { useTurnos } from '@/hooks/useTurnos';
+import { supabase } from '@/lib/supabase';
 
 export default function DashboardGestora() {
-    const [filtroAtivo, setFiltroAtivo] = useState<'todos' | 'hoje' | 'faltas'>('hoje');
-    const [modalAberto, setModalAberto] = useState(false);
-    const [turnoSelecionado, setTurnoSelecionado] = useState<Turno | null>(null);
+  const [filtroAtivo, setFiltroAtivo] = useState<'todos' | 'hoje' | 'faltas'>('todos');
+  const [dataSelecionada, setDataSelecionada] = useState(new Date().toISOString().split('T')[0]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [turnoSelecionado, setTurnoSelecionado] = useState<Turno | null>(null);
 
-    // Hook personalizado para buscar dados do Supabase
-    const {
-        turnos,
-        loading,
-        error,
-        refetch,
-        stats
-    } = useTurnos(filtroAtivo);
+  const { turnos, loading, stats, refetch } = useTurnos(filtroAtivo, dataSelecionada);
 
-    const handleSubstituir = (turno: Turno) => {
-        setTurnoSelecionado(turno);
-        setModalAberto(true);
-    };
+  const handleAbrirSubstituicao = (turno: Turno) => {
+    setTurnoSelecionado(turno);
+    setIsModalOpen(true);
+  };
 
-    const handleFecharModal = () => {
-        setModalAberto(false);
-        setTurnoSelecionado(null);
-    };
+  const handleRegistarFalta = async (turnoId: string) => {
+    const { error } = await supabase
+      .from('shifts')
+      .update({ status: 'no_show' })
+      .eq('id', turnoId);
 
-    // Componente de Loading
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center">
-                <div className="bg-white rounded-2xl p-8 shadow-lg border border-slate-200 text-center">
-                    <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-                    <h2 className="text-lg font-semibold text-slate-900 mb-2">A carregar turnos...</h2>
-                    <p className="text-slate-500 text-sm">A ligar à base de dados</p>
-                </div>
-            </div>
-        );
+    if (!error) {
+      await refetch();
+      setFiltroAtivo('faltas'); // Salto automático para a aba de faltas
     }
+  };
 
-    // Componente de Erro
-    if (error) {
-        return (
-            <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
-                <div className="bg-white rounded-2xl p-8 shadow-lg border border-red-200 text-center max-w-md">
-                    <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                    <h2 className="text-lg font-semibold text-slate-900 mb-2">Erro ao carregar dados</h2>
-                    <p className="text-slate-600 text-sm mb-4">{error}</p>
-                    <button
-                        onClick={refetch}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-                    >
-                        <RefreshCw className="w-4 h-4" />
-                        Tentar novamente
-                    </button>
-                </div>
-            </div>
-        );
-    }
+  const turnosFiltrados = turnos.filter(t => 
+    t.cliente.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    t.cuidadora?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-    return (
-        <div className="min-h-screen bg-slate-50">
-            {/* Header Mobile */}
-            <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-16">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-                                <span className="text-white font-bold text-lg">C</span>
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-bold text-slate-900">CuidaFlow</h1>
-                                <p className="text-xs text-slate-500">Painel da Gestora</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={refetch}
-                                className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg"
-                                title="Atualizar dados"
-                            >
-                                <RefreshCw className="w-5 h-5" />
-                            </button>
-                            <button className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg relative">
-                                <Bell className="w-5 h-5" />
-                                {stats.faltas > 0 && (
-                                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                                )}
-                            </button>
-                            <button className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg">
-                                <Menu className="w-5 h-5" />
-                            </button>
-                            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                                <span className="text-white text-sm font-medium">S</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </header>
-
-            {/* Stats Cards */}
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm text-slate-600">Turnos Hoje</span>
-                            <Calendar className="w-4 h-4 text-slate-400" />
-                        </div>
-                        <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
-                    </div>
-
-                    <div className="bg-red-50 rounded-2xl p-4 border border-red-200">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm text-red-700">Faltas Urgentes</span>
-                            <AlertCircle className="w-4 h-4 text-red-500" />
-                        </div>
-                        <p className="text-2xl font-bold text-red-700">{stats.faltas}</p>
-                    </div>
-
-                    <div className="bg-orange-50 rounded-2xl p-4 border border-orange-200">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm text-orange-700">Pendentes</span>
-                            <Clock className="w-4 h-4 text-orange-500" />
-                        </div>
-                        <p className="text-2xl font-bold text-orange-700">{stats.pendentes}</p>
-                    </div>
-
-                    <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm text-slate-600">Críticos</span>
-                            <AlertCircle className="w-4 h-4 text-red-500" />
-                        </div>
-                        <p className="text-2xl font-bold text-red-600">{stats.criticos}</p>
-                    </div>
-                </div>
-
-                {/* Filtros */}
-                <div className="mt-6 flex items-center gap-2 overflow-x-auto pb-2">
-                    <button
-                        onClick={() => setFiltroAtivo('hoje')}
-                        className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${filtroAtivo === 'hoje'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
-                            }`}
-                    >
-                        Hoje
-                    </button>
-                    <button
-                        onClick={() => setFiltroAtivo('faltas')}
-                        className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${filtroAtivo === 'faltas'
-                            ? 'bg-red-600 text-white'
-                            : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
-                            }`}
-                    >
-                        Faltas
-                    </button>
-                    <button
-                        onClick={() => setFiltroAtivo('todos')}
-                        className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${filtroAtivo === 'todos'
-                            ? 'bg-slate-800 text-white'
-                            : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
-                            }`}
-                    >
-                        Todos
-                    </button>
-                    <div className="flex-1"></div>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-full text-sm text-slate-700 hover:bg-slate-50">
-                        <Filter className="w-4 h-4" />
-                        Filtros
-                    </button>
-                </div>
-
-                {/* Lista de Turnos */}
-                <div className="mt-6">
-                    <ListaTurnos
-                        turnos={turnos}
-                        onSubstituir={handleSubstituir}
-                    />
-                </div>
-            </div>
-
-            {/* Modal de Substituição */}
-            {modalAberto && turnoSelecionado && (
-                <ModalSubstituicao
-                    turno={turnoSelecionado}
-                    onClose={handleFecharModal}
-                    onSuccess={refetch} // <--- ISTO É O QUE FAZ O DASHBOARD ATUALIZAR NA HORA!
-                />
-            )}
+  return (
+    <div className="space-y-6">
+      {/* Cabeçalho com Seletor de Data */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Operações</h1>
+          <p className="text-slate-500 text-sm">Gestão de escalas e incidências em tempo real</p>
         </div>
-    );
+        
+        <div className="flex items-center gap-3 bg-white p-2 rounded-xl shadow-sm border border-slate-200">
+          <Calendar className="w-5 h-5 text-slate-400 ml-2" />
+          <input 
+            type="date" 
+            value={dataSelecionada}
+            onChange={(e) => setDataSelecionada(e.target.value)}
+            className="border-none focus:ring-0 font-medium text-slate-700 bg-transparent outline-none cursor-pointer"
+          />
+        </div>
+      </div>
+
+      {/* Stats Cards (Mantidos conforme o teu design) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-3 text-slate-500 mb-2">
+            <Users className="w-4 h-4" />
+            <span className="text-sm font-medium">Total de Turnos</span>
+          </div>
+          <div className="text-2xl font-bold text-slate-900">{stats.total}</div>
+        </div>
+        
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-3 text-red-500 mb-2">
+            <AlertCircle className="w-4 h-4" />
+            <span className="text-sm font-medium">Faltas por Resolver</span>
+          </div>
+          <div className="text-2xl font-bold text-red-600">{stats.faltas}</div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-3 text-amber-500 mb-2">
+            <Clock className="w-4 h-4" />
+            <span className="text-sm font-medium">Pendentes</span>
+          </div>
+          <div className="text-2xl font-bold text-amber-600">{stats.pendentes}</div>
+        </div>
+
+        <div className="bg-indigo-600 p-4 rounded-2xl shadow-md shadow-indigo-200">
+          <div className="flex items-center gap-3 text-indigo-100 mb-2">
+            <Plus className="w-4 h-4" />
+            <span className="text-sm font-medium">Novo Turno</span>
+          </div>
+          <button className="text-white font-bold flex items-center gap-2 hover:translate-x-1 transition-transform">
+            Agendar <Plus className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Filtros e Busca */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div className="flex flex-col md:flex-row gap-4 justify-between">
+          <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
+            <button 
+              onClick={() => setFiltroAtivo('todos')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filtroAtivo === 'todos' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Todos
+            </button>
+            <button 
+              onClick={() => setFiltroAtivo('hoje')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filtroAtivo === 'hoje' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Confirmados
+            </button>
+            <button 
+              onClick={() => setFiltroAtivo('faltas')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filtroAtivo === 'faltas' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Faltas
+            </button>
+          </div>
+
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input 
+              type="text"
+              placeholder="Pesquisar cliente ou cuidadora..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+            />
+          </div>
+        </div>
+
+        {/* Lista de Turnos */}
+        <ListaTurnos 
+          turnos={turnosFiltrados} 
+          loading={loading}
+          onSubstituir={handleAbrirSubstituicao}
+          onFalta={handleRegistarFalta} // Passamos a nova função aqui
+        />
+      </div>
+
+      {/* Modal de Substituição */}
+      {isModalOpen && turnoSelecionado && (
+        <ModalSubstituicao 
+          turno={turnoSelecionado}
+          onClose={() => setIsModalOpen(false)}
+          onSuccess={refetch}
+        />
+      )}
+    </div>
+  );
 }
