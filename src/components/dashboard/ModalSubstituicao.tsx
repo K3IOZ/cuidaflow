@@ -9,7 +9,8 @@ interface ModalProps {
   onConfirm: () => void;
 }
 
-export function ModalSubstituicao({ isOpen, onClose, turno, onConfirm }: ModalProps) {
+// ADICIONEI 'default' AQUI 👇
+export default function ModalSubstituicao({ isOpen, onClose, turno, onConfirm }: ModalProps) {
   const [cuidadoras, setCuidadoras] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -32,21 +33,20 @@ export function ModalSubstituicao({ isOpen, onClose, turno, onConfirm }: ModalPr
 
       if (errCare) throw errCare;
 
-      // 2. Buscar turnos que coincidem com este horário (para ver quem está ocupada)
-      // Nota: Isto é uma verificação simples. Num sistema final seria mais robusto.
+      // 2. Buscar turnos que coincidem com este horário
       const { data: busyShifts } = await supabase
         .from('shifts')
         .select('caregiver_id')
-        .eq('shift_date', turno.data) // No mesmo dia
-        .eq('start_time', turno.horario.split(' - ')[0]) // À mesma hora de início
-        .neq('status', 'no_show'); // Que não tenham faltado
+        .eq('shift_date', turno.data)
+        .eq('start_time', turno.horario.split(' - ')[0])
+        .neq('status', 'no_show');
 
       const busyIds = busyShifts?.map(s => s.caregiver_id) || [];
 
       // 3. Marcar quem está disponível
       const processadas = allCaregivers.map(c => ({
         ...c,
-        isDisponivel: !busyIds.includes(c.id) // Se não estiver na lista de ocupadas
+        isDisponivel: !busyIds.includes(c.id)
       }));
 
       // Ordenar: Disponíveis primeiro
@@ -62,19 +62,18 @@ export function ModalSubstituicao({ isOpen, onClose, turno, onConfirm }: ModalPr
   const handleAtribuir = async (idCuidadora: string) => {
     setProcessing(true);
     try {
-      // ATUALIZAÇÃO NO SUPABASE
       const { error } = await supabase
         .from('shifts')
         .update({
           caregiver_id: idCuidadora,
-          status: 'confirmed' // Passa de 'no_show' ou 'scheduled' para Confirmado
+          status: 'confirmed'
         })
         .eq('id', turno.id);
 
       if (error) throw error;
 
-      onConfirm(); // Atualiza o dashboard
-      onClose();   // Fecha o modal
+      onConfirm();
+      onClose();
 
     } catch (error) {
       console.error("Erro ao atribuir:", error);
@@ -90,7 +89,6 @@ export function ModalSubstituicao({ isOpen, onClose, turno, onConfirm }: ModalPr
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
         
-        {/* Cabeçalho */}
         <div className="bg-slate-50 p-4 border-b flex justify-between items-center">
           <div>
             <h3 className="font-bold text-lg text-slate-800">Substituir Cuidadora</h3>
@@ -103,7 +101,6 @@ export function ModalSubstituicao({ isOpen, onClose, turno, onConfirm }: ModalPr
           </button>
         </div>
 
-        {/* Lista */}
         <div className="p-4 max-h-[60vh] overflow-y-auto">
           {loading ? (
             <div className="text-center py-8 text-slate-400">A procurar disponibilidades...</div>
