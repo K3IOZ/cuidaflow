@@ -11,10 +11,10 @@ export function useTurnos(filtroAtivo: 'todos' | 'hoje' | 'faltas') {
         setLoading(true);
         setError(null);
         try {
-            // FIX 1: Data dinâmica (Hoje) em vez de fixa
-            const hoje = new Date().toISOString().split('T')[0];
+            // FIX CRÍTICO: Usar a data LOCAL (Porto) e não UTC
+            // 'en-CA' força o formato YYYY-MM-DD que o Supabase gosta
+            const hojeLocal = new Date().toLocaleDateString('en-CA');
 
-            // FIX 2: Adicionei o filtro da Organização ID correto
             let query = supabase
                 .from('shifts')
                 .select(`
@@ -22,23 +22,29 @@ export function useTurnos(filtroAtivo: 'todos' | 'hoje' | 'faltas') {
                     client:clients (name, address),
                     caregiver:caregivers!caregiver_id (name)
                 `)
-                .eq('org_id', 'a0000000-0000-0000-0000-000000000001'); // ID da Simulação
+                .eq('org_id', 'a0000000-0000-0000-0000-000000000001') // ID da Simulação
+                .order('start_time', { ascending: true }); // Ordenar por hora
 
-            // Se o filtro for 'hoje', usa a data atual
+            // Filtro 'Hoje' usando a data correta
             if (filtroAtivo === 'hoje') {
-                query = query.eq('shift_date', hoje);
+                query = query.eq('shift_date', hojeLocal);
             }
 
-            // Filtro de faltas
+            // Filtro 'Faltas'
             if (filtroAtivo === 'faltas') {
-                query = query.in('status', ['no_show']);
+                query = query.eq('status', 'no_show');
             }
 
             const { data, error: dbError } = await query;
             if (dbError) throw dbError;
 
-            // Transformação de dados
             const transformados: Turno[] = (data as any[]).map(s => {
+                // Cálculo real da duração (ex: 13:00 às 09:00)
+                const start = parseInt(s.start_time.split(':')[0]);
+                const end = parseInt(s.end_time.split(':')[0]);
+                let duracaoHoras = end - start;
+                if (duracaoHoras < 0) duracaoHoras += 24; // Compensa turnos que passam da meia-noite
+
                 let statusFinal: any = 'pendente';
                 if (s.status === 'no_show') statusFinal = 'falta';
                 if (s.status === 'confirmed') statusFinal = 'confirmado';
@@ -48,11 +54,12 @@ export function useTurnos(filtroAtivo: 'todos' | 'hoje' | 'faltas') {
                     id: s.id,
                     cliente: s.client?.name || 'Sem nome',
                     localizacao: s.client?.address || 'Sem morada',
-                    horario: `${s.start_time} - ${s.end_time}`,
-                    duracao: '4h', // Valor por defeito seguro
+                    // Formata para não mostrar segundos (13:00 em vez de 13:00:00)
+                    horario: `${s.start_time.slice(0,5)} - ${s.end_time.slice(0,5)}`,
+                    duracao: `${duracaoHoras}h`,
                     status: statusFinal,
                     tipo: s.type || 'Normal',
-                    data: s.shift_date,
+                    data: s.shift_date, // A data está aqui, só falta o cartão mostrá-la
                     tarefas: Array.isArray(s.tasks)
                         ? s.tasks.map((t: any) => typeof t === 'object' ? t.name : t)
                         : [],
