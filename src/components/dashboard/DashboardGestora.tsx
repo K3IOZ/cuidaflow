@@ -52,7 +52,6 @@ export default function DashboardGestora() {
         error = e;
     } else if (lastAction.type === 'UPDATE') {
         // Se foi editado, revertemos para os dados antigos (usa .oldData)
-        // CORREÇÃO AQUI: update(lastAction.oldData) em vez de .data
         const { error: e } = await supabase.from(lastAction.table).update(lastAction.oldData).eq('id', lastAction.id);
         error = e;
     }
@@ -78,6 +77,27 @@ export default function DashboardGestora() {
   const handleAbrirSubstituicao = (turno: Turno) => {
     setTurnoSelecionado(turno);
     setIsModalOpen(true);
+  };
+
+  // --- NOVA FUNÇÃO: ATRIBUIR CUIDADORA COM UNDO ---
+  const handleAtribuirCuidadora = async (turnoId: string, caregiverId: string) => {
+    // 1. Snapshot para Undo (como estava o turno antes de atribuir?)
+    const { data: currentShift } = await supabase.from('shifts').select('*').eq('id', turnoId).single();
+    
+    if (currentShift) {
+        // 2. Guardar no Undo
+        setTemporaryUndo({ type: 'UPDATE', table: 'shifts', id: turnoId, oldData: currentShift });
+
+        // 3. Executar Ação (Atualizar na BD)
+        const { error } = await supabase.from('shifts').update({ 
+            caregiver_id: caregiverId, 
+            status: 'confirmed' 
+        }).eq('id', turnoId);
+        
+        if (!error) {
+            await refetch();
+        }
+    }
   };
 
   const handleRegistarFalta = async (turnoId: string) => {
@@ -128,7 +148,12 @@ export default function DashboardGestora() {
   const getUndoText = () => {
     if (!lastAction) return '';
     if (lastAction.type === 'DELETE') return 'Desfazer Apagar';
-    if (lastAction.type === 'UPDATE') return 'Desfazer Alteração';
+    if (lastAction.type === 'UPDATE') {
+        // Se os dados antigos tinham cuidadora null, então estávamos a atribuir
+        if (!lastAction.oldData.caregiver_id) return 'Desfazer Atribuição';
+        if (lastAction.oldData.status === 'confirmed') return 'Desfazer Falta';
+        return 'Desfazer Alteração';
+    }
     return 'Desfazer';
   }
 
@@ -283,8 +308,14 @@ export default function DashboardGestora() {
         </div>
       </main>
 
-      {/* MODAIS */}
-      {isModalOpen && turnoSelecionado && <ModalSubstituicao turno={turnoSelecionado} onClose={() => setIsModalOpen(false)} onSuccess={refetch} />}
+      {/* MODAIS: Repara que agora passamos 'onAssign' e não 'onSuccess' */}
+      {isModalOpen && turnoSelecionado && (
+          <ModalSubstituicao 
+            turno={turnoSelecionado} 
+            onClose={() => setIsModalOpen(false)} 
+            onAssign={handleAtribuirCuidadora} 
+          />
+      )}
       {isClientModalOpen && <ModalAdicionarCliente onClose={() => setIsClientModalOpen(false)} onSuccess={refetch} />}
       {isCaregiverModalOpen && <ModalAdicionarCuidadora onClose={() => setIsCaregiverModalOpen(false)} onSuccess={refetch} />}
       {isShiftModalOpen && <ModalAdicionarTurno onClose={() => setIsShiftModalOpen(false)} onSuccess={refetch} />}

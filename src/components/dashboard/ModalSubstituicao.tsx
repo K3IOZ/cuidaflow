@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react';
 import { X, MapPin, Star, AlertCircle, MessageCircle, Phone, MessageSquare, Check } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+// Importamos o Turno para tipar melhor, mas mantemos compatibilidade
+import { Turno } from '@/types'; 
 
 interface ModalProps {
   onClose: () => void;
-  turno: any;
-  onSuccess: () => void;
+  turno: any; // Mantive 'any' como tinhas, para não dar stress com tipos
+  // REMOVI: onSuccess
+  // ADICIONEI: onAssign (Manda o ID do turno e da cuidadora para o Dashboard)
+  onAssign: (turnoId: string, caregiverId: string) => Promise<void>;
 }
 
-export default function ModalSubstituicao({ onClose, turno, onSuccess }: ModalProps) {
+export default function ModalSubstituicao({ onClose, turno, onAssign }: ModalProps) {
   const [cuidadoras, setCuidadoras] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -43,45 +47,37 @@ export default function ModalSubstituicao({ onClose, turno, onSuccess }: ModalPr
         
         // --- CÁLCULO DO MATCH REAL ---
         let matchScore = 0;
-        // Vamos buscar as necessidades que vieram do hook useTurnos
         const clientNeeds = turno.care_needs || {};
         
-        // Filtra apenas as necessidades que estão "true" (Ex: {higiene: true, mobilidade: true})
         const activeNeeds = Object.keys(clientNeeds).filter(k => clientNeeds[k] === true);
         
         if (activeNeeds.length === 0) {
-          // Se o cliente não tem exigências específicas, começamos com 100% (qualquer uma serve)
           matchScore = 100; 
         } else {
           let matches = 0;
           activeNeeds.forEach(need => {
-            // Normalizamos para lowercase para garantir que 'Higiene' bate com 'higiene'
             const skillKey = need.toLowerCase();
             const caregiverSkills = c.skills || {};
             
-            // Verifica se a cuidadora tem a skill
             if (caregiverSkills[skillKey] === true || caregiverSkills[need] === true) {
               matches++;
             }
           });
-          // Regra de 3 simples
           matchScore = Math.round((matches / activeNeeds.length) * 100);
         }
 
-        // Se estiver ocupada, o match vai a zero para não ser sugerida
         if (isOcupada) matchScore = 0;
 
         return {
           ...c,
           isDisponivel: !isOcupada,
           match: matchScore,
-          rating: (4.0 + Math.random()).toFixed(1), // Rating mantemos simulado por enquanto
+          rating: (4.0 + Math.random()).toFixed(1),
           distancia: (Math.random() * 10).toFixed(1),
           telefone: c.phone || '910000000'
         };
       });
 
-      // Ordenar: Disponíveis primeiro, depois pelo maior Match Score
       setCuidadoras(processadas.sort((a: any, b: any) => {
         if (a.isDisponivel !== b.isDisponivel) return a.isDisponivel ? -1 : 1;
         return b.match - a.match;
@@ -97,16 +93,11 @@ export default function ModalSubstituicao({ onClose, turno, onSuccess }: ModalPr
     if (processing) return;
     setProcessing(true);
     try {
-      const { error } = await supabase
-        .from('shifts')
-        .update({ caregiver_id: idCuidadora, status: 'confirmed' })
-        .eq('id', turno.id);
-
-      if (error) throw error;
-      await onSuccess();
+      // AQUI ESTÁ A MUDANÇA: Já não grava direto. Chama o pai.
+      await onAssign(turno.id, idCuidadora);
       onClose();
     } catch (error) {
-      alert("Erro ao atribuir.");
+      alert("Erro ao processar atribuição.");
     } finally {
       setProcessing(false);
     }
@@ -184,7 +175,7 @@ export default function ModalSubstituicao({ onClose, turno, onSuccess }: ModalPr
                     </div>
                   </div>
                   
-                  {/* Pequenas etiquetas das Skills (Novo) */}
+                  {/* Pequenas etiquetas das Skills */}
                   <div className="flex gap-1 flex-wrap justify-end max-w-[100px]">
                     {Object.keys(c.skills || {}).slice(0, 3).map(skill => (
                       <span key={skill} className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-bold uppercase">
