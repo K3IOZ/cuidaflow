@@ -9,6 +9,8 @@ interface ModalProps {
 
 export default function ModalAdicionarCliente({ onClose, onSuccess }: ModalProps) {
   const [loading, setLoading] = useState(false);
+  
+  // Estado inicial com todas as care_needs possíveis
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -16,18 +18,25 @@ export default function ModalAdicionarCliente({ onClose, onSuccess }: ModalProps
     higiene: false,
     mobilidade: false,
     medicacao: false,
-    companhia: false
+    companhia: false,
+    alimentacao: false,
+    limpeza: false,
+    compras: false
   });
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
+    // Construir o objeto JSON para a BD
     const care_needs = {
       higiene: formData.higiene,
       mobilidade: formData.mobilidade,
       medicacao: formData.medicacao,
-      companhia: formData.companhia
+      companhia: formData.companhia,
+      alimentacao: formData.alimentacao,
+      limpeza: formData.limpeza,
+      compras: formData.compras
     };
 
     try {
@@ -53,8 +62,11 @@ export default function ModalAdicionarCliente({ onClose, onSuccess }: ModalProps
     }
   };
 
-  // Definir as necessidades como um array constante para o TypeScript reconhecer as chaves
-  const necessidades = ['higiene', 'mobilidade', 'medicacao', 'companhia'] as const;
+  // Lista completa de necessidades para gerar os botões
+  const necessidades = [
+    'higiene', 'mobilidade', 'medicacao', 'companhia', 
+    'alimentacao', 'limpeza', 'compras'
+  ] as const;
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[110] p-4 backdrop-blur-sm">
@@ -128,11 +140,11 @@ export default function ModalAdicionarCliente({ onClose, onSuccess }: ModalProps
                   key={need} 
                   type="button" 
                   onClick={() => setFormData(prev => ({ ...prev, [need]: !prev[need] }))} 
-                  className={`px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all capitalize ${
                     formData[need] ? 'bg-indigo-50 border-indigo-500 text-indigo-700' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'
                   }`}
                 >
-                  {need.toUpperCase()}
+                  {need}
                 </button>
               ))}
             </div>
