@@ -6,7 +6,7 @@ import { Turno } from '@/types';
 
 interface ModalProps {
   onClose: () => void;
-  turno: any; // Mantive 'any' como tinhas, para não dar stress com tipos
+  turno: any; 
   // REMOVI: onSuccess
   // ADICIONEI: onAssign (Manda o ID do turno e da cuidadora para o Dashboard)
   onAssign: (turnoId: string, caregiverId: string) => Promise<void>;
@@ -175,11 +175,14 @@ export default function ModalSubstituicao({ onClose, turno, onAssign }: ModalPro
                     </div>
                   </div>
                   
-                  {/* Pequenas etiquetas das Skills */}
-                  <div className="flex gap-1 flex-wrap justify-end max-w-[100px]">
-                    {Object.keys(c.skills || {}).slice(0, 3).map(skill => (
+                  {/* Pequenas etiquetas das Skills (AGORA SEM CORTES) */}
+                  <div className="flex gap-1 flex-wrap justify-end max-w-[120px]">
+                    {Object.keys(c.skills || {})
+                      .filter(k => c.skills[k] === true)
+                      .slice(0, 4) // Mostramos até 4 tags para não estragar layout
+                      .map(skill => (
                       <span key={skill} className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-bold uppercase">
-                        {skill.slice(0,3)}
+                        {skill} 
                       </span>
                     ))}
                   </div>
