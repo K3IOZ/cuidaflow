@@ -2,21 +2,7 @@
 
 import { useState } from 'react';
 import { 
-  Users, 
-  Calendar, 
-  AlertCircle, 
-  Clock,
-  Filter,
-  Search,
-  Plus,
-  Menu,
-  Bell,
-  RefreshCcw,
-  User,
-  LogOut,
-  ChevronDown,
-  UserPlus,
-  Briefcase
+  Users, Calendar, AlertCircle, Clock, Filter, Search, Plus, Menu, Bell, RefreshCcw, User, UserPlus, Briefcase, RotateCcw
 } from 'lucide-react';
 import { useTurnos } from '@/hooks/useTurnos';
 import { Turno } from '@/types';
@@ -41,6 +27,9 @@ export default function DashboardGestora() {
   
   const [turnoSelecionado, setTurnoSelecionado] = useState<Turno | null>(null);
 
+  // Estado para o UNDO (Desfazer)
+  const [lastAction, setLastAction] = useState<{ type: 'DELETE', data: any, table: string } | null>(null);
+
   // 2. DADOS
   const { turnos, loading, stats, refetch } = useTurnos(filtroAtivo, dataSelecionada);
 
@@ -51,15 +40,51 @@ export default function DashboardGestora() {
   };
 
   const handleRegistarFalta = async (turnoId: string) => {
-    const { error } = await supabase
-      .from('shifts')
-      .update({ status: 'no_show' })
-      .eq('id', turnoId);
-
+    const { error } = await supabase.from('shifts').update({ status: 'no_show' }).eq('id', turnoId);
     if (!error) {
       await refetch();
       setFiltroAtivo('faltas');
     }
+  };
+
+  // --- NOVA LÓGICA: ELIMINAR COM UNDO ---
+  const handleEliminarTurno = async (turnoId: string) => {
+    // 1. Guardar o turno antes de apagar (para poder recuperar)
+    // Vamos buscar os dados reais ao supabase para garantir que temos tudo para o restauro
+    const { data: realShift } = await supabase.from('shifts').select('*').eq('id', turnoId).single();
+    
+    if (realShift) {
+        // Guardamos no estado temporário
+        setLastAction({ type: 'DELETE', data: realShift, table: 'shifts' });
+        
+        // 2. Apagar do Supabase
+        await supabase.from('shifts').delete().eq('id', turnoId);
+        
+        // 3. Atualizar UI
+        refetch();
+
+        // 4. Limpar o botão de Undo após 8 segundos (tempo suficiente para se arrepender)
+        setTimeout(() => setLastAction(null), 8000);
+    }
+  };
+
+  const handleUndo = async () => {
+    if (!lastAction) return;
+    
+    // Restaurar o registo apagado usando os dados que guardámos
+    const { error } = await supabase.from(lastAction.table).insert(lastAction.data);
+    
+    if (!error) {
+        setLastAction(null);
+        refetch();
+    } else {
+        alert("Erro ao desfazer: " + error.message);
+    }
+  };
+
+  const handleEditarTurno = (turno: Turno) => {
+      // Por enquanto, apenas avisamos que está em construção
+      alert(`Funcionalidade de Editar o turno de ${turno.cliente} a caminho!`);
   };
 
   const turnosFiltrados = turnos.filter(t => 
@@ -87,6 +112,16 @@ export default function DashboardGestora() {
           </div>
 
           <div className="flex items-center gap-2 md:gap-4">
+            {/* BOTÃO UNDO (Aparece só quando há algo para desfazer) */}
+            {lastAction && (
+                <button 
+                    onClick={handleUndo}
+                    className="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-full font-bold text-xs animate-in slide-in-from-top-4 shadow-lg hover:bg-slate-700 transition-all"
+                >
+                    <RotateCcw className="w-3 h-3" /> Desfazer Apagar
+                </button>
+            )}
+
             <button 
               onClick={() => refetch()} 
               className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500"
@@ -115,7 +150,7 @@ export default function DashboardGestora() {
       {/* CONTEÚDO PRINCIPAL */}
       <main className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
         
-        {/* Título e Ações de Topo */}
+        {/* Título e Ações */}
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
           <div className="space-y-1">
             <h1 className="text-3xl font-black text-slate-900 tracking-tight">Painel de Gestora</h1>
@@ -123,16 +158,19 @@ export default function DashboardGestora() {
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
-            <button 
-              onClick={() => setIsClientModalOpen(true)}
-              className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold text-sm hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm active:scale-95"
-            >
+            {lastAction && (
+                <button 
+                    onClick={handleUndo}
+                    className="md:hidden w-full mb-2 flex items-center justify-center gap-2 px-4 py-3 bg-slate-800 text-white rounded-xl font-bold text-sm animate-pulse"
+                >
+                    <RotateCcw className="w-4 h-4" /> Desfazer Apagar Turno
+                </button>
+            )}
+
+            <button onClick={() => setIsClientModalOpen(true)} className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold text-sm hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm active:scale-95">
               <UserPlus className="w-4 h-4 text-indigo-500" /> + Cliente
             </button>
-            <button 
-              onClick={() => setIsCaregiverModalOpen(true)}
-              className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold text-sm hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm active:scale-95"
-            >
+            <button onClick={() => setIsCaregiverModalOpen(true)} className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold text-sm hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm active:scale-95">
               <Briefcase className="w-4 h-4 text-emerald-500" /> + Cuidadora
             </button>
 
@@ -140,12 +178,7 @@ export default function DashboardGestora() {
 
             <div className="flex items-center gap-3 bg-white p-2 rounded-2xl shadow-sm border border-slate-200 group hover:border-indigo-300 transition-colors">
               <Calendar className="w-5 h-5 text-indigo-500 ml-2" />
-              <input 
-                type="date" 
-                value={dataSelecionada}
-                onChange={(e) => setDataSelecionada(e.target.value)}
-                className="border-none focus:ring-0 font-bold text-slate-700 bg-transparent outline-none cursor-pointer pr-4"
-              />
+              <input type="date" value={dataSelecionada} onChange={(e) => setDataSelecionada(e.target.value)} className="border-none focus:ring-0 font-bold text-slate-700 bg-transparent outline-none cursor-pointer pr-4" />
             </div>
           </div>
         </div>
@@ -159,7 +192,6 @@ export default function DashboardGestora() {
             </div>
             <div className="text-4xl font-black text-slate-900">{stats.total}</div>
           </div>
-          
           <div className="bg-white p-6 rounded-3xl border border-red-100 shadow-sm">
             <div className="flex items-center gap-3 text-red-500 mb-4">
               <div className="p-2 bg-red-50 rounded-lg"><AlertCircle className="w-5 h-5" /></div>
@@ -167,7 +199,6 @@ export default function DashboardGestora() {
             </div>
             <div className="text-4xl font-black text-red-600">{stats.faltas}</div>
           </div>
-
           <div className="bg-white p-6 rounded-3xl border border-amber-100 shadow-sm">
             <div className="flex items-center gap-3 text-amber-500 mb-4">
               <div className="p-2 bg-amber-50 rounded-lg"><Clock className="w-5 h-5" /></div>
@@ -175,11 +206,7 @@ export default function DashboardGestora() {
             </div>
             <div className="text-4xl font-black text-amber-600">{stats.pendentes}</div>
           </div>
-
-          <div 
-            onClick={() => setIsShiftModalOpen(true)}
-            className="bg-slate-900 p-6 rounded-3xl shadow-xl shadow-slate-200 flex flex-col justify-between group cursor-pointer hover:bg-indigo-950 transition-all"
-          >
+          <div onClick={() => setIsShiftModalOpen(true)} className="bg-slate-900 p-6 rounded-3xl shadow-xl shadow-slate-200 flex flex-col justify-between group cursor-pointer hover:bg-indigo-950 transition-all">
             <div className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Agenda Rápida</div>
             <button className="text-white font-bold flex items-center gap-3 text-lg mt-4">
               Novo Turno <div className="p-1 bg-white/10 rounded-lg group-hover:bg-white/20"><Plus className="w-5 h-5" /></div>
@@ -196,16 +223,9 @@ export default function DashboardGestora() {
                 <button onClick={() => setFiltroAtivo('hoje')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${filtroAtivo === 'hoje' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Confirmados</button>
                 <button onClick={() => setFiltroAtivo('faltas')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${filtroAtivo === 'faltas' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Faltas</button>
               </div>
-
               <div className="relative w-full md:max-w-md group">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                <input 
-                  type="text"
-                  placeholder="Pesquisar cliente ou cuidadora..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-6 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-sm"
-                />
+                <input type="text" placeholder="Pesquisar cliente ou cuidadora..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-12 pr-6 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-sm" />
               </div>
             </div>
           </div>
@@ -216,24 +236,18 @@ export default function DashboardGestora() {
               loading={loading}
               onSubstituir={handleAbrirSubstituicao}
               onFalta={handleRegistarFalta}
+              onEliminar={handleEliminarTurno} // <--- ISTO é o que faltava no teu!
+              onEditar={handleEditarTurno}     // <--- ISTO também!
             />
           </div>
         </div>
       </main>
 
-      {/* 4. MODAIS */}
-      {isModalOpen && turnoSelecionado && (
-        <ModalSubstituicao turno={turnoSelecionado} onClose={() => setIsModalOpen(false)} onSuccess={refetch} />
-      )}
-      {isClientModalOpen && (
-        <ModalAdicionarCliente onClose={() => setIsClientModalOpen(false)} onSuccess={refetch} />
-      )}
-      {isCaregiverModalOpen && (
-        <ModalAdicionarCuidadora onClose={() => setIsCaregiverModalOpen(false)} onSuccess={refetch} />
-      )}
-      {isShiftModalOpen && (
-        <ModalAdicionarTurno onClose={() => setIsShiftModalOpen(false)} onSuccess={refetch} />
-      )}
+      {/* MODAIS */}
+      {isModalOpen && turnoSelecionado && <ModalSubstituicao turno={turnoSelecionado} onClose={() => setIsModalOpen(false)} onSuccess={refetch} />}
+      {isClientModalOpen && <ModalAdicionarCliente onClose={() => setIsClientModalOpen(false)} onSuccess={refetch} />}
+      {isCaregiverModalOpen && <ModalAdicionarCuidadora onClose={() => setIsCaregiverModalOpen(false)} onSuccess={refetch} />}
+      {isShiftModalOpen && <ModalAdicionarTurno onClose={() => setIsShiftModalOpen(false)} onSuccess={refetch} />}
     </div>
   );
 }

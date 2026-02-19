@@ -23,7 +23,7 @@ export function useTurnos(filtroAtivo: 'todos' | 'hoje' | 'faltas', dataSelecion
                     tasks, 
                     type,
                     caregiver_id,
-                    client:clients (name, address),
+                    client:clients (name, address, care_needs),
                     caregiver:caregivers!caregiver_id (name)
                 `)
                 .eq('shift_date', dataSelecionada)
@@ -61,7 +61,8 @@ export function useTurnos(filtroAtivo: 'todos' | 'hoje' | 'faltas', dataSelecion
                     tipo: s.type || 'Normal',
                     data: s.shift_date,
                     tarefas: Array.isArray(s.tasks) ? s.tasks : [],
-                    cuidadora: s.caregiver?.name || null
+                    cuidadora: s.caregiver?.name || null,
+                    care_needs: s.client?.care_needs || {} // <--- ADICIONADO: Necessário para o Match
                 };
             });
 

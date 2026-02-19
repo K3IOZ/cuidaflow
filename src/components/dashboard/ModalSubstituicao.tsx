@@ -20,12 +20,14 @@ export default function ModalSubstituicao({ onClose, turno, onSuccess }: ModalPr
   const fetchDadosMatching = async () => {
     setLoading(true);
     try {
+      // 1. Buscar todas as cuidadoras
       const { data: allCaregivers } = await supabase
         .from('caregivers')
         .select('*')
         .eq('org_id', 'a0000000-0000-0000-0000-000000000001')
         .eq('is_active', true);
 
+      // 2. Verificar quem está ocupada
       const { data: busyShifts } = await supabase
         .from('shifts')
         .select('caregiver_id')
@@ -35,22 +37,51 @@ export default function ModalSubstituicao({ onClose, turno, onSuccess }: ModalPr
 
       const busyIds = busyShifts?.map((s: any) => s.caregiver_id) || [];
 
+      // 3. Processar o Match Real
       const processadas = (allCaregivers || []).map((c: any) => {
         const isOcupada = busyIds.includes(c.id);
-        let baseMatch = 70 + Math.floor(Math.random() * 25);
-        if (c.name.includes('Jocelina') || c.name.includes('Vera')) baseMatch = 98;
-        if (isOcupada) baseMatch = 15;
+        
+        // --- CÁLCULO DO MATCH REAL ---
+        let matchScore = 0;
+        // Vamos buscar as necessidades que vieram do hook useTurnos
+        const clientNeeds = turno.care_needs || {};
+        
+        // Filtra apenas as necessidades que estão "true" (Ex: {higiene: true, mobilidade: true})
+        const activeNeeds = Object.keys(clientNeeds).filter(k => clientNeeds[k] === true);
+        
+        if (activeNeeds.length === 0) {
+          // Se o cliente não tem exigências específicas, começamos com 100% (qualquer uma serve)
+          matchScore = 100; 
+        } else {
+          let matches = 0;
+          activeNeeds.forEach(need => {
+            // Normalizamos para lowercase para garantir que 'Higiene' bate com 'higiene'
+            const skillKey = need.toLowerCase();
+            const caregiverSkills = c.skills || {};
+            
+            // Verifica se a cuidadora tem a skill
+            if (caregiverSkills[skillKey] === true || caregiverSkills[need] === true) {
+              matches++;
+            }
+          });
+          // Regra de 3 simples
+          matchScore = Math.round((matches / activeNeeds.length) * 100);
+        }
+
+        // Se estiver ocupada, o match vai a zero para não ser sugerida
+        if (isOcupada) matchScore = 0;
 
         return {
           ...c,
           isDisponivel: !isOcupada,
-          match: baseMatch,
-          rating: (4.2 + Math.random() * 0.7).toFixed(1),
-          distancia: (Math.random() * 6).toFixed(1),
+          match: matchScore,
+          rating: (4.0 + Math.random()).toFixed(1), // Rating mantemos simulado por enquanto
+          distancia: (Math.random() * 10).toFixed(1),
           telefone: c.phone || '910000000'
         };
       });
 
+      // Ordenar: Disponíveis primeiro, depois pelo maior Match Score
       setCuidadoras(processadas.sort((a: any, b: any) => {
         if (a.isDisponivel !== b.isDisponivel) return a.isDisponivel ? -1 : 1;
         return b.match - a.match;
@@ -106,7 +137,7 @@ export default function ModalSubstituicao({ onClose, turno, onSuccess }: ModalPr
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <div>
             <h3 className="font-black text-xl text-slate-900">Substituir Cuidadora</h3>
-            <p className="text-sm text-slate-500 font-medium">A analisar perfil ideal para <span className="text-indigo-600">{turno?.cliente}</span></p>
+            <p className="text-sm text-slate-500 font-medium">A analisar perfil ideal para <span className="text-indigo-600 font-bold">{turno?.cliente}</span></p>
           </div>
           <button onClick={onClose} className="p-2.5 hover:bg-white hover:shadow-md rounded-xl transition-all text-slate-400">
             <X className="w-6 h-6" />
@@ -118,7 +149,7 @@ export default function ModalSubstituicao({ onClose, turno, onSuccess }: ModalPr
           {loading ? (
             <div className="flex flex-col items-center py-12 text-slate-400 font-medium">
               <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mb-4"></div>
-              A calcular matching...
+              A calcular compatibilidade...
             </div>
           ) : (
             cuidadoras.map((c: any) => (
@@ -127,14 +158,18 @@ export default function ModalSubstituicao({ onClose, turno, onSuccess }: ModalPr
                 className={`bg-white p-4 rounded-2xl border-2 transition-all relative group ${
                   c.isDisponivel 
                     ? 'border-slate-100 hover:border-indigo-500 cursor-pointer' 
-                    : 'border-transparent opacity-60'
+                    : 'border-transparent opacity-60 grayscale-[0.5]'
                 }`}
                 onClick={() => c.isDisponivel && handleAtribuir(c.id)}
               >
                 <div className="flex justify-between items-start">
                   <div className="flex gap-4">
-                    <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-700 font-black text-lg">
-                      {c.name.charAt(0)}
+                    {/* Badge do Match Score */}
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg ${
+                      c.match >= 80 ? 'bg-emerald-100 text-emerald-700' : 
+                      c.match >= 50 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      {c.match}%
                     </div>
                     <div>
                       <h4 className="font-bold text-slate-900">{c.name}</h4>
@@ -148,16 +183,18 @@ export default function ModalSubstituicao({ onClose, turno, onSuccess }: ModalPr
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <span className={`text-[10px] font-black px-2 py-1 rounded-lg uppercase ${
-                      c.match > 90 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                    }`}>
-                      {c.match}% Match
-                    </span>
+                  
+                  {/* Pequenas etiquetas das Skills (Novo) */}
+                  <div className="flex gap-1 flex-wrap justify-end max-w-[100px]">
+                    {Object.keys(c.skills || {}).slice(0, 3).map(skill => (
+                      <span key={skill} className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-bold uppercase">
+                        {skill.slice(0,3)}
+                      </span>
+                    ))}
                   </div>
                 </div>
 
-                {/* BOTÕES DE CONTACTO (A NOVIDADE) */}
+                {/* BOTÕES DE CONTACTO */}
                 <div className="mt-4 flex items-center justify-between border-t border-slate-50 pt-3">
                   <div className="flex gap-2">
                     <button 

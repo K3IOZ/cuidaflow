@@ -4,12 +4,19 @@ export interface Turno {
     localizacao: string;
     horario: string;
     duracao: string;
-    // Adicionado 'vazio' para permitir a atribuição de novos turnos
     status: 'confirmado' | 'falta' | 'pendente' | 'critico' | 'no_show' | 'vazio'; 
     cuidadora?: string | null;
     tipo: 'Normal' | 'Adaptado';
     data: string;
     tarefas: string[];
+    // NOVO: Necessário para o cálculo de match
+    care_needs?: {
+        higiene?: boolean;
+        mobilidade?: boolean;
+        medicacao?: boolean;
+        companhia?: boolean;
+        [key: string]: any;
+    };
 }
 
 export interface Cuidadora {
