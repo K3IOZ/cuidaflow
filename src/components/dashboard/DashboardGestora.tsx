@@ -47,14 +47,13 @@ export default function DashboardGestora() {
     let error = null;
 
     if (lastAction.type === 'DELETE') {
-        // Se foi apagado, inserimos os dados de volta
+        // Se foi apagado, inserimos os dados de volta (usa .data)
         const { error: e } = await supabase.from(lastAction.table).insert(lastAction.data);
         error = e;
     } else if (lastAction.type === 'UPDATE') {
-        // Se foi editado (ex: Falta), revertemos para os dados antigos
-        // Removemos campos que não devem ser atualizados diretamente, se necessário.
-        // Aqui assumimos que oldData tem o objeto completo da row.
-        const { error: e } = await supabase.from(lastAction.table).update(lastAction.data).eq('id', lastAction.id);
+        // Se foi editado, revertemos para os dados antigos (usa .oldData)
+        // CORREÇÃO AQUI: update(lastAction.oldData) em vez de .data
+        const { error: e } = await supabase.from(lastAction.table).update(lastAction.oldData).eq('id', lastAction.id);
         error = e;
     }
     
