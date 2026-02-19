@@ -13,6 +13,11 @@ import ModalAdicionarCuidadora from './ModalAdicionarCuidadora';
 import ModalAdicionarTurno from './ModalAdicionarTurno';
 import { supabase } from '@/lib/supabase';
 
+// Definir o tipo de ação para o Undo Universal
+type UndoAction = 
+  | { type: 'DELETE'; table: string; data: any }
+  | { type: 'UPDATE'; table: string; id: string; oldData: any };
+
 export default function DashboardGestora() {
   // 1. ESTADOS
   const [filtroAtivo, setFiltroAtivo] = useState<'todos' | 'hoje' | 'faltas'>('todos');
@@ -27,52 +32,31 @@ export default function DashboardGestora() {
   
   const [turnoSelecionado, setTurnoSelecionado] = useState<Turno | null>(null);
 
-  // Estado para o UNDO (Desfazer)
-  const [lastAction, setLastAction] = useState<{ type: 'DELETE', data: any, table: string } | null>(null);
+  // Estado para o UNDO (Universal)
+  const [lastAction, setLastAction] = useState<UndoAction | null>(null);
 
   // 2. DADOS
   const { turnos, loading, stats, refetch } = useTurnos(filtroAtivo, dataSelecionada);
 
   // 3. HANDLERS
-  const handleAbrirSubstituicao = (turno: Turno) => {
-    setTurnoSelecionado(turno);
-    setIsModalOpen(true);
-  };
 
-  const handleRegistarFalta = async (turnoId: string) => {
-    const { error } = await supabase.from('shifts').update({ status: 'no_show' }).eq('id', turnoId);
-    if (!error) {
-      await refetch();
-      setFiltroAtivo('faltas');
-    }
-  };
-
-  // --- NOVA LÓGICA: ELIMINAR COM UNDO ---
-  const handleEliminarTurno = async (turnoId: string) => {
-    // 1. Guardar o turno antes de apagar (para poder recuperar)
-    // Vamos buscar os dados reais ao supabase para garantir que temos tudo para o restauro
-    const { data: realShift } = await supabase.from('shifts').select('*').eq('id', turnoId).single();
-    
-    if (realShift) {
-        // Guardamos no estado temporário
-        setLastAction({ type: 'DELETE', data: realShift, table: 'shifts' });
-        
-        // 2. Apagar do Supabase
-        await supabase.from('shifts').delete().eq('id', turnoId);
-        
-        // 3. Atualizar UI
-        refetch();
-
-        // 4. Limpar o botão de Undo após 8 segundos (tempo suficiente para se arrepender)
-        setTimeout(() => setLastAction(null), 8000);
-    }
-  };
-
+  // --- UNDO UNIVERSAL ---
   const handleUndo = async () => {
     if (!lastAction) return;
     
-    // Restaurar o registo apagado usando os dados que guardámos
-    const { error } = await supabase.from(lastAction.table).insert(lastAction.data);
+    let error = null;
+
+    if (lastAction.type === 'DELETE') {
+        // Se foi apagado, inserimos os dados de volta
+        const { error: e } = await supabase.from(lastAction.table).insert(lastAction.data);
+        error = e;
+    } else if (lastAction.type === 'UPDATE') {
+        // Se foi editado (ex: Falta), revertemos para os dados antigos
+        // Removemos campos que não devem ser atualizados diretamente, se necessário.
+        // Aqui assumimos que oldData tem o objeto completo da row.
+        const { error: e } = await supabase.from(lastAction.table).update(lastAction.data).eq('id', lastAction.id);
+        error = e;
+    }
     
     if (!error) {
         setLastAction(null);
@@ -82,8 +66,57 @@ export default function DashboardGestora() {
     }
   };
 
+  const setTemporaryUndo = (action: UndoAction) => {
+    setLastAction(action);
+    // Limpar o botão de Undo após 8 segundos
+    setTimeout(() => {
+        setLastAction(prev => (prev === action ? null : prev));
+    }, 8000);
+  };
+
+  // --- ACÇÕES DE GESTÃO ---
+
+  const handleAbrirSubstituicao = (turno: Turno) => {
+    setTurnoSelecionado(turno);
+    setIsModalOpen(true);
+  };
+
+  const handleRegistarFalta = async (turnoId: string) => {
+    // 1. Buscar estado atual para o Undo
+    const { data: currentShift } = await supabase.from('shifts').select('*').eq('id', turnoId).single();
+    
+    if (currentShift) {
+        // 2. Guardar no Undo
+        setTemporaryUndo({ type: 'UPDATE', table: 'shifts', id: turnoId, oldData: currentShift });
+
+        // 3. Executar Ação
+        const { error } = await supabase.from('shifts').update({ status: 'no_show' }).eq('id', turnoId);
+        
+        if (!error) {
+            await refetch();
+            setFiltroAtivo('faltas');
+        }
+    }
+  };
+
+  const handleEliminarTurno = async (turnoId: string) => {
+    // 1. Buscar dados para restauro
+    const { data: realShift } = await supabase.from('shifts').select('*').eq('id', turnoId).single();
+    
+    if (realShift) {
+        // 2. Guardar no Undo
+        setTemporaryUndo({ type: 'DELETE', data: realShift, table: 'shifts' });
+        
+        // 3. Executar Ação
+        await supabase.from('shifts').delete().eq('id', turnoId);
+        
+        // 4. Atualizar UI
+        refetch();
+    }
+  };
+
   const handleEditarTurno = (turno: Turno) => {
-      // Por enquanto, apenas avisamos que está em construção
+      // Futuramente, ao editar, guardaremos o estado anterior num UPDATE action
       alert(`Funcionalidade de Editar o turno de ${turno.cliente} a caminho!`);
   };
 
@@ -91,6 +124,14 @@ export default function DashboardGestora() {
     t.cliente.toLowerCase().includes(searchQuery.toLowerCase()) ||
     t.cuidadora?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Helper para texto do botão Undo
+  const getUndoText = () => {
+    if (!lastAction) return '';
+    if (lastAction.type === 'DELETE') return 'Desfazer Apagar';
+    if (lastAction.type === 'UPDATE') return 'Desfazer Alteração';
+    return 'Desfazer';
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -118,7 +159,7 @@ export default function DashboardGestora() {
                     onClick={handleUndo}
                     className="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-full font-bold text-xs animate-in slide-in-from-top-4 shadow-lg hover:bg-slate-700 transition-all"
                 >
-                    <RotateCcw className="w-3 h-3" /> Desfazer Apagar
+                    <RotateCcw className="w-3 h-3" /> {getUndoText()}
                 </button>
             )}
 
@@ -163,7 +204,7 @@ export default function DashboardGestora() {
                     onClick={handleUndo}
                     className="md:hidden w-full mb-2 flex items-center justify-center gap-2 px-4 py-3 bg-slate-800 text-white rounded-xl font-bold text-sm animate-pulse"
                 >
-                    <RotateCcw className="w-4 h-4" /> Desfazer Apagar Turno
+                    <RotateCcw className="w-4 h-4" /> {getUndoText()}
                 </button>
             )}
 
@@ -236,8 +277,8 @@ export default function DashboardGestora() {
               loading={loading}
               onSubstituir={handleAbrirSubstituicao}
               onFalta={handleRegistarFalta}
-              onEliminar={handleEliminarTurno} // <--- ISTO é o que faltava no teu!
-              onEditar={handleEditarTurno}     // <--- ISTO também!
+              onEliminar={handleEliminarTurno}
+              onEditar={handleEditarTurno}
             />
           </div>
         </div>
