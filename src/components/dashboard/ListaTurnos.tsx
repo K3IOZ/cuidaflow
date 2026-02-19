@@ -12,20 +12,27 @@ import {
   RotateCcw 
 } from 'lucide-react';
 import { Turno } from '@/types';
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // <--- ADICIONADO useEffect
 
 interface ListaTurnosProps {
   turnos: Turno[];
   loading: boolean;
   onSubstituir: (turno: Turno) => void;
   onFalta: (turnoId: string) => void;
-  // ESTAS DUAS LINHAS SÃO AS QUE FALTAVAM PARA O ERRO DESAPARECER:
   onEditar: (turno: Turno) => void;
   onEliminar: (turnoId: string) => void;
 }
 
 export default function ListaTurnos({ turnos, loading, onSubstituir, onFalta, onEditar, onEliminar }: ListaTurnosProps) {
   const [eliminandoId, setEliminandoId] = useState<string | null>(null);
+
+  // --- CORREÇÃO DO ESTADO CINZENTO ---
+  // Sempre que a lista de turnos muda (ex: depois de um Undo), 
+  // limpamos o ID que estava marcado como "a eliminar".
+  useEffect(() => {
+    setEliminandoId(null);
+  }, [turnos]);
+  // -----------------------------------
 
   if (loading) {
     return (
