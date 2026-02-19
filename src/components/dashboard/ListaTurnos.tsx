@@ -4,20 +4,29 @@ import {
   User, 
   AlertCircle, 
   CheckCircle2, 
-  ArrowRightLeft,
-  UserMinus,
-  Plus
+  ArrowRightLeft, 
+  UserMinus, 
+  Plus, 
+  Edit2, 
+  Trash2, 
+  RotateCcw 
 } from 'lucide-react';
 import { Turno } from '@/types';
+import { useState } from 'react';
 
 interface ListaTurnosProps {
   turnos: Turno[];
   loading: boolean;
   onSubstituir: (turno: Turno) => void;
   onFalta: (turnoId: string) => void;
+  // ESTAS DUAS LINHAS SÃO AS QUE FALTAVAM PARA O ERRO DESAPARECER:
+  onEditar: (turno: Turno) => void;
+  onEliminar: (turnoId: string) => void;
 }
 
-export default function ListaTurnos({ turnos, loading, onSubstituir, onFalta }: ListaTurnosProps) {
+export default function ListaTurnos({ turnos, loading, onSubstituir, onFalta, onEditar, onEliminar }: ListaTurnosProps) {
+  const [eliminandoId, setEliminandoId] = useState<string | null>(null);
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
@@ -41,15 +50,13 @@ export default function ListaTurnos({ turnos, loading, onSubstituir, onFalta }: 
         <div 
           key={turno.id}
           className={`p-5 rounded-2xl border transition-all hover:shadow-md ${
-            turno.status === 'falta' 
-              ? 'bg-red-50/50 border-red-100' 
-              : turno.status === 'vazio'
-              ? 'bg-amber-50/30 border-amber-100 border-dashed'
-              : 'bg-white border-slate-200'
+            eliminandoId === turno.id ? 'opacity-30 grayscale' : 
+            turno.status === 'falta' ? 'bg-red-50/50 border-red-100' : 
+            turno.status === 'vazio' ? 'bg-amber-50/30 border-amber-100 border-dashed' :
+            'bg-white border-slate-200'
           }`}
         >
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            {/* Info Cliente */}
             <div className="flex items-start gap-4">
               <div className={`mt-1 p-2.5 rounded-xl ${
                 turno.status === 'falta' ? 'bg-red-100 text-red-600' : 
@@ -80,8 +87,9 @@ export default function ListaTurnos({ turnos, loading, onSubstituir, onFalta }: 
               </div>
             </div>
 
-            {/* Cuidadora e Botões de Acção */}
             <div className="flex items-center gap-6">
+              
+              {/* Informação da Cuidadora */}
               <div className="flex items-center gap-3 min-w-[180px]">
                 <div className={`w-9 h-9 rounded-full flex items-center justify-center ${
                   turno.status === 'falta' ? 'bg-red-100 text-red-400' : 
@@ -102,8 +110,29 @@ export default function ListaTurnos({ turnos, loading, onSubstituir, onFalta }: 
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                {/* LÓGICA DE BOTÕES: SUBSTITUIR vs ATRIBUIR vs CONFIRMADO */}
+              {/* Botões de Ação */}
+              <div className="flex items-center gap-3 pl-4 border-l border-slate-100">
+                {/* Botões de Gestão (Editar / Eliminar) */}
+                <div className="flex items-center gap-1">
+                    <button 
+                      onClick={() => onEditar(turno)}
+                      className="p-2 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-all text-slate-400"
+                      title="Editar Turno"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setEliminandoId(turno.id);
+                        setTimeout(() => onEliminar(turno.id), 500); // Pequeno delay visual
+                      }}
+                      className="p-2 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all text-slate-400"
+                      title="Eliminar Turno"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                </div>
+
                 {turno.status === 'falta' || turno.status === 'vazio' ? (
                   <button 
                     onClick={() => onSubstituir(turno)}
@@ -117,7 +146,7 @@ export default function ListaTurnos({ turnos, loading, onSubstituir, onFalta }: 
                     {turno.status === 'falta' ? 'Substituir' : 'Atribuir'}
                   </button>
                 ) : (
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <button 
                       onClick={() => onFalta(turno.id)}
                       className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
@@ -126,7 +155,7 @@ export default function ListaTurnos({ turnos, loading, onSubstituir, onFalta }: 
                       <UserMinus className="w-5 h-5" />
                     </button>
                     
-                    <span className="flex items-center gap-1.5 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-xl text-xs font-black border border-emerald-100">
+                    <span className="flex items-center gap-1.5 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-xl text-xs font-black border border-emerald-100 hidden sm:flex">
                       <CheckCircle2 className="w-4 h-4" /> CONFIRMADO
                     </span>
                   </div>
